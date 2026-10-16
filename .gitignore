@@ -1,0 +1,44 @@
+# Datasets and generated artifacts. The shards are reproducible from
+# scripts/partition_data.py, so there is no reason to carry them in git.
+data/
+data_iid/
+artifacts/
+*.npz
+
+# Certificate material. Committing a private key is the classic own goal.
+certs/
+*.pem
+*.key
+*.crt
+*.srl
+
+# Terraform. State can hold secrets, and the provider plugins are large.
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/*.tfplan
+# The provider lock file IS committed on purpose, so every team member
+# resolves the same AWS provider version.
+infra/terraform.tfvars
+
+# Run bookkeeping written by scripts/start_run.sh
+.fedmed-run
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Node
+dashboard/node_modules/
+dashboard/dist/
+dashboard/public/partition_summary.json
+dashboard/public/centralized_baseline.json
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

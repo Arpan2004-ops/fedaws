@@ -1,0 +1,453 @@
+/* Design tokens.
+ *
+ * Both themes are defined explicitly rather than by inverting one. The dark
+ * series colours are the same three hues re-stepped for the dark surface, and
+ * the set was checked with the palette validator: worst adjacent colour-vision
+ * separation is 9.2 in light and 9.4 in dark, against a target of 8.
+ *
+ * Aqua sits below 3:1 against the light surface, so every series carries a
+ * visible direct label rather than relying on its colour.
+ */
+
+:root {
+  color-scheme: light;
+
+  --surface-1: #fcfcfb;
+  --page-plane: #f9f9f7;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --gridline: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+
+  --series-1: #2a78d6; /* global model */
+  --series-2: #eb6834; /* hospital A */
+  --series-3: #1baf7a; /* hospital B */
+  --series-4: #e87ba4; /* hospital C */
+
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-critical: #d03b3b;
+
+  --shadow: 0 1px 2px rgba(11, 11, 11, 0.05);
+  --radius: 10px;
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+
+    --surface-1: #1a1a19;
+    --page-plane: #0d0d0d;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --gridline: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #d55181;
+
+    --shadow: none;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface-1: #1a1a19;
+  --page-plane: #0d0d0d;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --gridline: #2c2c2a;
+  --baseline: #383835;
+  --border: rgba(255, 255, 255, 0.1);
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #d55181;
+
+  --shadow: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--page-plane);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px 20px 64px;
+}
+
+/* ---------------------------------------------------------------- header */
+
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.masthead h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.masthead p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  max-width: 60ch;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+select,
+button {
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 11px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled),
+select:hover {
+  border-color: var(--baseline);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.pill .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.pill.good .dot {
+  background: var(--status-good);
+}
+
+.pill.warn .dot {
+  background: var(--status-warning);
+}
+
+/* ----------------------------------------------------------------- cards */
+
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px 20px;
+}
+
+.card h2 {
+  margin: 0 0 2px;
+  font-size: 15px;
+  font-weight: 620;
+}
+
+.card .subtitle {
+  margin: 0 0 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.grid {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.grid.tiles {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.grid.split {
+  grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+}
+
+.grid.hospitals {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+@media (max-width: 900px) {
+  .grid.split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ------------------------------------------------------------ stat tiles */
+
+.tile .label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tile .value {
+  font-size: 30px;
+  font-weight: 640;
+  letter-spacing: -0.02em;
+  margin-top: 4px;
+}
+
+.tile .note {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+/* ---------------------------------------------------------------- charts */
+
+.chart-wrap {
+  position: relative;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.legend .swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  box-shadow: 0 4px 14px rgba(11, 11, 11, 0.12);
+  min-width: 132px;
+  z-index: 5;
+}
+
+.tooltip .head {
+  font-weight: 620;
+  margin-bottom: 4px;
+}
+
+.tooltip .row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------- hospitals */
+
+.hospital .name {
+  font-weight: 620;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hospital .marker {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
+
+.hospital dl {
+  margin: 12px 0 0;
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 4px 12px;
+  font-size: 13px;
+}
+
+.hospital dt {
+  color: var(--text-secondary);
+}
+
+.hospital dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------- predict */
+
+.dropzone {
+  border: 1px dashed var(--baseline);
+  border-radius: var(--radius);
+  padding: 22px;
+  text-align: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.dropzone:hover,
+.dropzone.active {
+  border-color: var(--series-1);
+  color: var(--text-primary);
+}
+
+.preview {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-top: 16px;
+}
+
+.preview img {
+  width: 128px;
+  height: 128px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--page-plane);
+}
+
+.result .verdict {
+  font-size: 20px;
+  font-weight: 640;
+}
+
+.prob-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.prob-row .track {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--gridline);
+  overflow: hidden;
+}
+
+.prob-row .fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+/* ---------------------------------------------------------------- tables */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+th,
+td {
+  text-align: right;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--gridline);
+}
+
+th:first-child,
+td:first-child {
+  text-align: left;
+}
+
+th {
+  color: var(--text-secondary);
+  font-weight: 560;
+}
+
+details summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-top: 14px;
+}
+
+.callout {
+  border-left: 3px solid var(--status-warning);
+  padding: 10px 14px;
+  background: var(--page-plane);
+  border-radius: 0 8px 8px 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-top: 14px;
+}
+
+.error {
+  border-left: 3px solid var(--status-critical);
+  padding: 10px 14px;
+  background: var(--page-plane);
+  border-radius: 0 8px 8px 0;
+  font-size: 13px;
+}
+
+footer {
+  margin-top: 28px;
+  color: var(--text-muted);
+  font-size: 12px;
+}

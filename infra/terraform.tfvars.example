@@ -1,0 +1,40 @@
+# Copy to terraform.tfvars and edit. Every value here has a working default in
+# variables.tf, so the file is optional; it exists to make the knobs visible.
+
+# AWS Academy Learner Lab accounts are pinned to us-east-1.
+region  = "us-east-1"
+project = "fedmed"
+
+# Leave empty to use arn:aws:iam::<your-account>:role/LabRole, which is what a
+# Learner Lab provides and what this stack expects. On a personal account,
+# point this at a role that can read the buckets and write to DynamoDB, ECR,
+# CloudWatch Logs and SSM.
+lab_role_arn = ""
+
+# --- the federated run -----------------------------------------------------
+num_rounds   = 10
+local_epochs = 1
+
+# --- privacy ---------------------------------------------------------------
+# 0.05 keeps accuracy usable and produces a very loose epsilon. Raise it to see
+# the trade-off; scripts/run_experiments.py measures the whole curve.
+dp_enabled          = true
+dp_noise_multiplier = 0.05
+dp_clip_norm        = 1.0
+
+# --- transport -------------------------------------------------------------
+# Run scripts/gen_certs.sh before turning this on. It needs Cloud Map, because
+# the certificate is issued for fl-server.fedmed.local and a Fargate task's IP
+# changes on every run.
+tls_enabled      = false
+enable_cloud_map = true
+
+# --- first apply -----------------------------------------------------------
+# Set this to false for the very first apply, then push the images, then set it
+# back to true. The function cannot be created before its image exists.
+create_lambda = true
+
+# --- cost ------------------------------------------------------------------
+task_cpu           = "1024" # 1 vCPU
+task_memory        = "2048" # MiB
+log_retention_days = 7

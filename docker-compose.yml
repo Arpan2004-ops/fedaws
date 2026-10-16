@@ -1,0 +1,120 @@
+# The whole platform on one laptop.
+#
+#   python scripts/partition_data.py     # once, to create the shards
+#   docker compose up --build
+#
+# This mirrors the Fargate deployment closely enough to be a real rehearsal: the
+# same four images, the same environment variables, the same startup race between
+# hospitals and aggregator. The only differences are that storage is a mounted
+# volume instead of S3, and Docker's DNS stands in for AWS Cloud Map.
+
+services:
+  fl-server:
+    build:
+      context: .
+      dockerfile: fl_server/Dockerfile
+    image: fedmed-server:local
+    container_name: fedmed-fl-server
+    environment:
+      RUN_ID: compose-run
+      NUM_ROUNDS: "10"
+      NUM_HOSPITALS: "3"
+      BIND_ADDRESS: 0.0.0.0:8080
+      STORAGE_BACKEND: local
+      LOCAL_ROOT: /workspace/artifacts
+      DP_ENABLED: "true"
+      DP_NOISE_MULTIPLIER: "0.05"
+      DP_CLIP_NORM: "1.0"
+      TLS_ENABLED: "false"
+      LOG_LEVEL: INFO
+    volumes:
+      - ./artifacts:/workspace/artifacts
+    ports:
+      - "8080:8080"
+
+  # The three hospitals are identical except for HOSPITAL_ID and the single
+  # directory each one is allowed to see. Note the :ro mount and that no hospital
+  # has the artifacts volume: a node can neither write the global model nor read
+  # another site's images.
+  hospital-a:
+    build:
+      context: .
+      dockerfile: hospital_node/Dockerfile
+    image: fedmed-hospital:local
+    container_name: fedmed-hospital-a
+    depends_on: [fl-server]
+    environment:
+      HOSPITAL_ID: a
+      SERVER_ADDRESS: fl-server:8080
+      SHARD_PATH: /workspace/data/shard.npz
+      STORAGE_BACKEND: local
+      LOCAL_EPOCHS: "1"
+      BATCH_SIZE: "64"
+      LEARNING_RATE: "0.001"
+      TLS_ENABLED: "false"
+    volumes:
+      - ./data/hospital_a:/workspace/data:ro
+
+  hospital-b:
+    # The same build block as hospital-a on purpose. Compose deduplicates by
+    # image tag, so this builds once; declaring it here means the service does
+    # not try to pull a tag that only exists because another service built it.
+    build:
+      context: .
+      dockerfile: hospital_node/Dockerfile
+    image: fedmed-hospital:local
+    container_name: fedmed-hospital-b
+    depends_on: [hospital-a]
+    environment:
+      HOSPITAL_ID: b
+      SERVER_ADDRESS: fl-server:8080
+      SHARD_PATH: /workspace/data/shard.npz
+      STORAGE_BACKEND: local
+      LOCAL_EPOCHS: "1"
+      BATCH_SIZE: "64"
+      LEARNING_RATE: "0.001"
+      TLS_ENABLED: "false"
+    volumes:
+      - ./data/hospital_b:/workspace/data:ro
+
+  hospital-c:
+    # The same build block as hospital-a on purpose. Compose deduplicates by
+    # image tag, so this builds once; declaring it here means the service does
+    # not try to pull a tag that only exists because another service built it.
+    build:
+      context: .
+      dockerfile: hospital_node/Dockerfile
+    image: fedmed-hospital:local
+    container_name: fedmed-hospital-c
+    depends_on: [hospital-a]
+    environment:
+      HOSPITAL_ID: c
+      SERVER_ADDRESS: fl-server:8080
+      SHARD_PATH: /workspace/data/shard.npz
+      STORAGE_BACKEND: local
+      LOCAL_EPOCHS: "1"
+      BATCH_SIZE: "64"
+      LEARNING_RATE: "0.001"
+      TLS_ENABLED: "false"
+    volumes:
+      - ./data/hospital_c:/workspace/data:ro
+
+  inference-api:
+    build:
+      context: .
+      dockerfile: inference_api/Dockerfile.local
+    # Tagged -dev so it can never collide with the Lambda image, which is built
+    # from inference_api/Dockerfile and would otherwise claim the same name. The
+    # two images share application code but have completely different entry
+    # points, and starting the Lambda runtime here would look like a hang.
+    image: fedmed-api:local-dev
+    container_name: fedmed-api
+    environment:
+      STORAGE_BACKEND: local
+      LOCAL_ROOT: /workspace/artifacts
+      MODEL_CACHE_SECONDS: "5"
+      CORS_ORIGINS: "*"
+    volumes:
+      - ./artifacts:/workspace/artifacts:ro
+    ports:
+      - "8000:8000"

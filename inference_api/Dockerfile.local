@@ -1,0 +1,31 @@
+# Local development image for the inference API.
+#
+# The production image builds on the Lambda base and is invoked through Mangum.
+# For docker compose we want a plain uvicorn server on port 8000 so the browser
+# can talk to it directly, so the two Dockerfiles differ only in their entry
+# point. The application code is identical.
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_DEFAULT_TIMEOUT=1000 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+COPY inference_api/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir \
+        --default-timeout 1000 \
+        --retries 10 \
+        --index-url https://download.pytorch.org/whl/cpu \
+        --extra-index-url https://pypi.org/simple \
+        -r requirements.txt \
+    && pip install --no-cache-dir uvicorn==0.32.1
+
+COPY common /app/common
+RUN pip install --no-cache-dir /app/common
+
+COPY inference_api/app.py /app/app.py
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

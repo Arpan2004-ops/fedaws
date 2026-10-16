@@ -1,0 +1,15 @@
+# Everything needed to run the federation locally and produce the report figures.
+-e ./common
+numpy>=1.26.4
+torch>=2.5.1
+flwr>=1.15.2
+medmnist==3.0.2
+boto3==1.35.68
+fastapi==0.115.5
+uvicorn==0.32.1
+mangum==0.19.0
+pillow==11.0.0
+python-multipart==0.0.20
+matplotlib==3.9.2
+pytest==8.3.4
+httpx==0.28.1

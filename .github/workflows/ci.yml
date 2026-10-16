@@ -1,0 +1,186 @@
+# Continuous integration.
+#
+# There is no deploy job on purpose. An AWS Academy Learner Lab issues temporary
+# credentials that expire with the session, so there is nothing durable to give a
+# GitHub secret. Deployment is a human running the runbook.
+#
+# What CI does protect is everything a broken push would otherwise only reveal
+# during a demo: the tests, the container builds, the Terraform configuration and
+# the dashboard bundle.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: Python tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # CPU wheels only. The CUDA build is roughly ten times the size and
+          # nothing here runs on a GPU.
+          pip install --index-url https://download.pytorch.org/whl/cpu \
+                      --extra-index-url https://pypi.org/simple \
+                      torch==2.5.1 numpy==1.26.4
+          pip install flwr==1.15.2 fastapi==0.115.5 mangum==0.19.0 pillow==11.0.0 \
+                      python-multipart==0.0.20 boto3==1.35.68 httpx==0.28.1 pytest==8.3.4
+          pip install -e ./common
+
+      - name: Run the test suite
+        run: python -m pytest -v
+
+      - name: Check the federation still converges
+        # A five-round smoke test on synthetic shards. Slow enough to be worth
+        # doing once, fast enough not to hold up a pull request.
+        run: |
+          python - <<'PY'
+          import numpy as np, os
+          rng = np.random.default_rng(0)
+          for name in ("hospital_a", "hospital_b", "hospital_c"):
+              os.makedirs(f"data/{name}", exist_ok=True)
+              count = rng.integers(120, 300)
+              labels = rng.integers(0, 2, size=count).astype(np.int64)
+              images = np.stack([
+                  (rng.integers(0, 80, (64, 64)) if label == 0
+                   else rng.integers(175, 256, (64, 64))).astype(np.uint8)
+                  for label in labels
+              ])
+              np.savez_compressed(f"data/{name}/shard.npz", images=images, labels=labels)
+          os.makedirs("data/server", exist_ok=True)
+          labels = rng.integers(0, 2, size=200).astype(np.int64)
+          images = np.stack([
+              (rng.integers(0, 80, (64, 64)) if label == 0
+               else rng.integers(175, 256, (64, 64))).astype(np.uint8)
+              for label in labels
+          ])
+          np.savez_compressed("data/server/test.npz", images=images, labels=labels)
+          print("synthetic shards written")
+          PY
+          python scripts/run_local.py --rounds 5 --dp --run-id ci
+          python - <<'PY'
+          import json, sys
+          with open("artifacts/global/summary.json", encoding="utf-8") as handle:
+              summary = json.load(handle)
+          print("final accuracy", summary["final_accuracy"])
+          # The synthetic task is trivially separable, so anything below this
+          # means aggregation itself is broken rather than merely unlucky.
+          if summary["final_accuracy"] < 0.75:
+              sys.exit("federation did not converge on a separable task")
+          PY
+
+  images:
+    name: Container builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stub the dataset the server image expects
+        # fl_server/Dockerfile copies data/server into the image. The real file
+        # is not in git, so CI supplies an empty stand-in to keep the build
+        # honest about everything else.
+        run: |
+          mkdir -p data/server
+          python -c "import numpy as np; np.savez_compressed('data/server/test.npz', images=np.zeros((1,64,64),dtype=np.uint8), labels=np.zeros(1,dtype=np.int64))"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the aggregator image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: fl_server/Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build the hospital image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: hospital_node/Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build the inference API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: inference_api/Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - name: Check formatting
+        run: terraform -chdir=infra fmt -check -recursive
+
+      - name: Validate
+        # No backend and no credentials: this checks the configuration itself,
+        # not what it would do to an account.
+        run: |
+          terraform -chdir=infra init -backend=false
+          terraform -chdir=infra validate
+
+  dashboard:
+    name: Dashboard build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - run: npm ci
+      - run: npm run build
+
+  shell:
+    name: Shell scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse every script
+        run: |
+          for script in scripts/*.sh; do
+            bash -n "$script" && echo "ok $script"
+          done
+
+      - name: Lint
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: ./scripts
+          # SC1091: aws_common.sh is sourced at runtime and shellcheck cannot
+          # follow it from the linter's working directory.
+          ignore_paths: node_modules
+        env:
+          SHELLCHECK_OPTS: -e SC1091
